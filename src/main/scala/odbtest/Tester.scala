@@ -249,12 +249,14 @@ object Tester extends App with StrictLogging {
           val hospitalProps = generator.generateHospital()
           hospitalProps.put("name", s"${settings.prefix}_hospital_${x}_$opNumber")
           val hospital = countingAddVertex(graph, "class:hospital", hospitalProps)
+          graph.commit()
 
           for (y <- 0 to settings.initialDoctorsPerHospital) {
             val doctorProps = generator.generateDoctor()
             doctorProps.put("name", s"${settings.prefix}_doctor_${y}_from_hospital_${x}_$opNumber")
             val doctor = countingAddVertex(graph, "class:doctor", doctorProps)
             doctor.addEdge("employed_at", hospital)
+            graph.commit()
           }
           graph.commit()
         }
