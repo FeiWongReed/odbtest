@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableMap
 import com.orientechnologies.orient.core.command.OCommandRequest
 import com.orientechnologies.orient.core.metadata.schema.OType
 import com.orientechnologies.orient.core.sql.OCommandSQL
+import com.tinkerpop.blueprints.{Parameter, Vertex}
 import com.tinkerpop.blueprints.impls.orient.{OrientGraph, OrientGraphFactory, OrientVertex}
 import com.typesafe.scalalogging.slf4j.StrictLogging
 import org.nohope.test.stress._
@@ -329,13 +330,14 @@ object Tester extends App with StrictLogging {
 
 
     orient.noTx { graph =>
-      val request = new OCommandSQL("CREATE INDEX :indexname ON :cname (:propertyname by key) unique;")
-      val command: OCommandRequest = graph.command(request)
+      //val request = new OCommandSQL("CREATE INDEX :indexname ON :cname (:propertyname by key) unique;")
+      //val command: OCommandRequest = graph.command(request)
 
 
       vertexTypes.foreach { v =>
         try {
-          command.execute(ImmutableMap.of("indexname", s"index-$v-name-key", "cname", "name"))
+          graph.createKeyIndex("name", classOf[Vertex], new Parameter("class", v), new Parameter("type", "unique"))
+          //command.execute(ImmutableMap.of("indexname", s"index-$v-name-key", "cname", "name"))
         } catch {
           case NonFatal(e) => logger.error(s"can't create index $v", e)
         }

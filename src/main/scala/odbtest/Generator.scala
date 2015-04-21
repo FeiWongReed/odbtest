@@ -1,11 +1,19 @@
 package odbtest
 
+import java.util.concurrent.ThreadLocalRandom
+
 import org.nohope.test.TRandom
 
 /**
   */
 class Generator {
   val random = TRandom.threadLocal()
+  val r = ThreadLocalRandom.current()
+  val values = Array.fill(5000) {
+    genMap()
+  }
+
+
   private def genMap(): java.util.Map[String, String] = {
     val ret = new java.util.HashMap[String, String]
     for (x <- 0 to 4) {
@@ -14,40 +22,45 @@ class Generator {
     ret
   }
 
+  def getValue() = {
+    values(r.nextInt(0, values.length))
+
+  }
+
   def generatePatient() = {
-    genMap()
+    getValue()
   }
 
   def generateCompany() = {
-    genMap()
+    getValue()
   }
 
   def generateInsuarance() = {
-    genMap()
+    getValue()
   }
 
 
   def generateHospital() = {
-    genMap()
+    getValue()
   }
 
   def generateDoctor() = {
-    genMap()
+    getValue()
   }
 
   def generateVisit() = {
-    genMap()
+    getValue()
   }
 
   def generateNotification() = {
-    genMap()
+    getValue()
   }
 
   def generatePayment() = {
-    genMap()
+    getValue()
   }
 
   def generateRejection() = {
-    genMap()
+    getValue()
   }
 }
