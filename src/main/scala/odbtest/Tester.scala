@@ -1,5 +1,6 @@
 package odbtest
 
+import java.nio.file.Paths
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicLong
 import java.{lang, util}
@@ -10,10 +11,14 @@ import com.orientechnologies.orient.core.metadata.schema.OType
 import com.orientechnologies.orient.core.sql.OCommandSQL
 import com.tinkerpop.blueprints.{Parameter, Vertex}
 import com.tinkerpop.blueprints.impls.orient.{OrientGraph, OrientGraphFactory, OrientVertex}
-import com.typesafe.scalalogging.slf4j.StrictLogging
+import com.typesafe.scalalogging.StrictLogging
 import org.nohope.test.stress._
-import org.nohope.test.stress.action.{Get, Invoke}
 import odbtest.settings._
+import org.nohope.test.stress.actions.Scenario
+import org.nohope.test.stress.functors.{Call, Get}
+import org.nohope.test.stress.result.ExportingInterpreter
+import org.nohope.test.stress.result.simplified.SimpleInterpreter
+
 
 import scala.util.Random
 import scala.util.control.NonFatal
@@ -77,16 +82,17 @@ object Tester extends App with StrictLogging {
     val orient = new Orient(factory)
     try {
       val setupElementsResult =
-        StressScenario.of(TimerResolution.NANOSECONDS)
-          .measure(1, 1, new Action {
+        StressTest
+          .prepare(1, 1, new Scenario[MeasureProvider] {
           override def doAction(p: MeasureProvider) = {
-            p.invoke("setup_elements", new Invoke() {
-              override def invoke() = {
-                setupElements(orient)
-              }
+            p.call("setup_elements", new Call() {
+              override def call() = setupElements(orient)
             })
           }
         })
+          .perform()
+          .interpret(new SimpleInterpreter)
+
       logger.info(s"Element setup: ${setupElementsResult.getRuntime}s")
     }
   }
@@ -96,22 +102,24 @@ object Tester extends App with StrictLogging {
     val factory = new OrientGraphFactory(db.remoteUrl, db.user, db.pass).setupPool(db.poolSize, db.poolSize)
     val generator = new Generator
 
-    logger.info(s"Filling database with: ${(settings.initialCompanies + settings.initialHospitals * (1+settings.initialDoctorsPerHospital)
-    + settings.initialPatients * (settings.initialVisits+1))*db.concurrency} elements")
+    logger.info(s"Filling database with: ${
+      (settings.initialCompanies + settings.initialHospitals * (1 + settings.initialDoctorsPerHospital)
+        + settings.initialPatients * (settings.initialVisits + 1)) * db.concurrency
+    } elements")
 
     val orient = new Orient(factory)
     try {
       val prefillResult =
-        StressScenario.of(TimerResolution.NANOSECONDS)
-          .measure(db.concurrency, 1, new Action {
+        StressTest
+          .prepare(db.concurrency, 1, new Scenario[MeasureProvider] {
           override def doAction(p: MeasureProvider) = {
-            p.invoke("initial_setup", new Invoke() {
-              override def invoke() = {
+            p.call("initial_setup", new Call {
+              override def call() = {
                 performInitialSetup(p.getOperationNumber, db.concurrency, orient, generator, settings)
               }
             })
           }
-        })
+        }).perform().interpret(new SimpleInterpreter, new ExportingInterpreter(Paths.get("prefill")))
       logger.info(s"Initial setup results:\n$prefillResult")
     }
   }
@@ -152,8 +160,8 @@ object Tester extends App with StrictLogging {
       val selectCompany = new OCommandSQL("select from insuarance_company where name = :name")
 
       val setupRelations =
-        StressScenario.of(TimerResolution.NANOSECONDS)
-          .measure(db.concurrency, db.opsPerThread, new Action {
+        StressTest
+          .prepare(db.concurrency, db.opsPerThread, new Scenario[MeasureProvider] {
 
           override def doAction(p: MeasureProvider) = {
             if (p.getOperationNumber % 500 == 0) {
@@ -162,11 +170,11 @@ object Tester extends App with StrictLogging {
 
             orient.tx { graph =>
               try {
-                val values = p.invoke("prepare_random_ids", new Get[RandomValues] {
+                val values = p.get("prepare_random_ids", new Get[RandomValues] {
                   override def get() = new RandomValues()
                 })
 
-                val (patientRequest, visitRequest, hospitalRequest, doctorRequest, companyRequest) = p.invoke("prepare_queries", new Get[(OCommandRequest, OCommandRequest, OCommandRequest, OCommandRequest, OCommandRequest)] {
+                val (patientRequest, visitRequest, hospitalRequest, doctorRequest, companyRequest) = p.get("prepare_queries", new Get[(OCommandRequest, OCommandRequest, OCommandRequest, OCommandRequest, OCommandRequest)] {
                   override def get() = {
                     val patientRequest = graph.command(selectPatient)
                     val visitRequest = graph.command(selectVisit)
@@ -178,7 +186,7 @@ object Tester extends App with StrictLogging {
                   }
                 })
 
-                val (patient, visit, hospital, doctor, company) = p.invoke("perform_selections", new Get[(OrientVertex, OrientVertex, OrientVertex, OrientVertex, OrientVertex)] {
+                val (patient, visit, hospital, doctor, company) = p.get("perform_selections", new Get[(OrientVertex, OrientVertex, OrientVertex, OrientVertex, OrientVertex)] {
                   override def get() = {
                     try {
                       (getVertex(patientRequest, ImmutableMap.of("name", s"${settings.prefix}_patient_${values.pId}_${values.pBlockId}"))
@@ -195,8 +203,8 @@ object Tester extends App with StrictLogging {
                   }
                 })
 
-                p.invoke("perform_writes", new Invoke {
-                  override def invoke() = {
+                p.call("perform_writes", new Call {
+                  override def call() = {
                     doctor.addEdge("accepted", visit)
                     patient.addEdge(values.visitFeedback, doctor)
                     val agreement = addVertex(graph, s"${settings.prefix}_insuarance_agreement", values.props)
@@ -206,8 +214,8 @@ object Tester extends App with StrictLogging {
                   }
                 })
 
-                p.invoke("perform_commit", new Invoke {
-                  override def invoke() = {
+                p.call("perform_commit", new Call {
+                  override def call() = {
                     graph.commit()
                   }
                 })
@@ -219,13 +227,13 @@ object Tester extends App with StrictLogging {
             }
 
           }
-        })
+        }).perform().interpret(new SimpleInterpreter, new ExportingInterpreter(Paths.get("rw")))
       logger.info(s"Relations setup results:\n$setupRelations")
 
-      import scala.collection.JavaConverters._
+      /*import scala.collection.JavaConverters._
       setupRelations.getResults.values().asScala.slice(0, 1).foreach(
         r => r.getErrors.asScala.foreach(_.printStackTrace())
-      )
+      )*/
     } finally {
       orient.close()
       factory.close()

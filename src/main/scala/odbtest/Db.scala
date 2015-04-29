@@ -1,7 +1,7 @@
 package odbtest
 
 import com.orientechnologies.orient.client.remote.OServerAdmin
-import com.typesafe.scalalogging.slf4j.StrictLogging
+import com.typesafe.scalalogging.StrictLogging
 import odbtest.settings.DbData
 
 /**
