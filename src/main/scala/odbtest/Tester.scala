@@ -119,7 +119,7 @@ object Tester extends App with StrictLogging {
               }
             })
           }
-        }).perform().interpret(new SimpleInterpreter, new ExportingInterpreter(Paths.get("prefill")))
+        }).perform().interpret(new SimpleInterpreter, new ExportingInterpreter(Paths.get("output"), "prefill"))
       logger.info(s"Initial setup results:\n$prefillResult")
     }
   }
@@ -227,7 +227,7 @@ object Tester extends App with StrictLogging {
             }
 
           }
-        }).perform().interpret(new SimpleInterpreter, new ExportingInterpreter(Paths.get("rw")))
+        }).perform().interpret(new SimpleInterpreter, new ExportingInterpreter(Paths.get("output"), "rw"))
       logger.info(s"Relations setup results:\n$setupRelations")
 
       /*import scala.collection.JavaConverters._

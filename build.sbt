@@ -17,10 +17,11 @@ def excludeBad(seq: Seq[ModuleID]) = {
 libraryDependencies ++= excludeBad(Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
   "ch.qos.logback" % "logback-classic" % "1.0.13",
-  "org.no-hope" % "test-utils-stress" % "0.2.0"
+  "org.no-hope" % "test-utils-stress" % "0.2.2"
 ))
 
 val orientDbVersion = "2.1-SNAPSHOT"
+
 libraryDependencies ++= excludeBad(Seq(
   // documentdb
   "com.orientechnologies" % "orientdb-core" % orientDbVersion
